@@ -6,7 +6,6 @@ import CompleteCircle from './CompleteCircle';
 import { FiPlusCircle } from 'react-icons/fi';
 
 const API_URL = 'http://localhost:5050/api/habits';
-const TEST_USER_ID = '000000000000000000000000';
 
 // Grouped options for Existing Actions (Atomic Habits style)
 const EXISTING_ACTION_GROUPS = [
@@ -195,7 +194,7 @@ const TrashIcon = ({color = '#888'}) => (
   </svg>
 );
 
-export default function HabitDemo() {
+export default function HabitDemo({ userId }) {
   const [existingAction, setExistingAction] = useState(ALL_EXISTING_OPTIONS[0]);
   const [newAction, setNewAction] = useState(ALL_NEW_ACTIONS[0]);
   const [habits, setHabits] = useState([]);
@@ -253,7 +252,7 @@ export default function HabitDemo() {
   }, [completedHabits, habits]);
 
   const fetchHabits = async () => {
-    const res = await fetch(`${API_URL}?user=${TEST_USER_ID}`);
+    const res = await fetch(`${API_URL}?user=${userId}`);
     const data = await res.json();
     setHabits(Array.isArray(data) ? data : []);
   };
@@ -304,7 +303,7 @@ export default function HabitDemo() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user: TEST_USER_ID,
+          user: userId,
           existingAction: getValue(existingAction),
           newAction: getValue(newAction),
         })
