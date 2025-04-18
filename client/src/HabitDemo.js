@@ -3,18 +3,6 @@ import React, { useState } from 'react';
 const API_URL = 'http://localhost:5050/api/habits';
 const TEST_USER_ID = '000000000000000000000000';
 
-const EXISTING_ACTIONS = [
-  'After waking up',
-  'After breakfast',
-  'After brushing my teeth',
-  'After lunch',
-  'After checking email',
-  'After afternoon meetings',
-  'After dinner',
-  'After washing dishes',
-  'After getting into bed',
-];
-
 const NEW_ACTIONS = [
   'Drink a glass of water',
   'Plan my daily tasks',
@@ -26,6 +14,103 @@ const NEW_ACTIONS = [
   'Write down one gratitude statement',
   'Journal briefly',
 ];
+
+// Grouped actions for dropdown
+const ACTION_GROUPS = [
+  {
+    label: 'Health Habits',
+    options: [
+      'Drink 8 glasses of water daily',
+      'Exercise for 30 minutes',
+      'Walk 10,000 steps',
+      'Eat 5 servings of fruits/vegetables',
+      'Take vitamins or supplements',
+      'Limit sugar intake',
+      'Avoid junk food',
+      'No soda consumption',
+      'No alcohol consumption',
+      'No smoking',
+      'Sleep at least 7 hours',
+      'Morning stretches or yoga',
+      'Track calorie intake',
+      'Meditate for 10 minutes',
+      'Practice deep breathing exercises',
+      'Monitor blood pressure',
+      'Track blood sugar levels',
+      'Floss teeth',
+      'Skincare routine',
+      'Take prescribed medications',
+      'Limit caffeine intake',
+      'Spend time outdoors',
+      'Track menstrual cycle',
+      'Practice gratitude journaling',
+      'Maintain proper posture',
+    ]
+  },
+  {
+    label: 'Productivity Habits',
+    options: [
+      'Plan daily tasks',
+      'Review weekly goals',
+      'Use a to-do list',
+      'Time block work sessions',
+      'Limit social media usage',
+      'Check emails at designated times',
+      'Declutter workspace',
+      'Set daily priorities',
+      'Use the Pomodoro technique',
+      'Reflect on daily achievements',
+      'Read for 30 minutes',
+      'Learn a new skill',
+      'Attend professional development sessions',
+      'Network with a colleague',
+      'Update project statuses',
+      'Organize digital files',
+      'Backup important data',
+      'Automate repetitive tasks',
+      'Set SMART goals',
+      'Review monthly progress',
+      'Limit multitasking',
+      'Take regular short breaks',
+      'Use productivity apps/tools',
+      'Maintain a consistent work schedule',
+      'Prepare for the next day',
+    ]
+  },
+  {
+    label: 'Wellness Habits',
+    options: [
+      'Meditate for 10 minutes',
+      'Practice daily gratitude',
+      'Write in a journal',
+      'Say positive affirmations',
+      'Do a digital detox (no phone/screens for 1+ hour)',
+      'Spend time in nature',
+      'Practice mindfulness (e.g., while eating or walking)',
+      'Sleep by a specific time (e.g., 10 PM)',
+      'Track mood or emotions',
+      'Do something relaxing (e.g., take a bath, listen to music)',
+    ]
+  },
+  {
+    label: 'Lifestyle Habits',
+    options: [
+      'Read a book/article',
+      'Clean a room or declutter',
+      'Cook a homemade meal',
+      'Limit screen time after dinner',
+      'Spend quality time with family or pets',
+      'Connect with a friend (call or message)',
+      'Practice a hobby (e.g., drawing, music, crafts)',
+      'No unnecessary spending',
+      'Make your bed',
+      'Wake up at the same time daily',
+    ]
+  }
+];
+
+// Flatten for default
+const ALL_ACTIONS = ACTION_GROUPS.flatMap(g => g.options);
 
 // SVG Trash Icon
 const TrashIcon = ({color = '#888'}) => (
@@ -40,7 +125,7 @@ const TrashIcon = ({color = '#888'}) => (
 );
 
 export default function HabitDemo() {
-  const [existingAction, setExistingAction] = useState(EXISTING_ACTIONS[0]);
+  const [existingAction, setExistingAction] = useState(ALL_ACTIONS[0]);
   const [newAction, setNewAction] = useState(NEW_ACTIONS[0]);
   const [timeOfDay, setTimeOfDay] = useState('morning');
   const [reminderTime, setReminderTime] = useState('');
@@ -114,7 +199,13 @@ export default function HabitDemo() {
             <label style={{ fontWeight: 500, color: '#333' }}>
               Existing Action
               <select value={existingAction} onChange={e => setExistingAction(e.target.value)} style={selectStyle}>
-                {EXISTING_ACTIONS.map((action, i) => <option key={i} value={action}>{action}</option>)}
+                {ACTION_GROUPS.map((group, gi) => (
+                  <optgroup key={gi} label={group.label}>
+                    {group.options.map((action, i) => (
+                      <option key={i} value={action}>{action}</option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
             </label>
             <label style={{ fontWeight: 500, color: '#333' }}>
