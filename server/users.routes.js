@@ -21,11 +21,28 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Get user by username
+// Get user by username, limit to 50 logins per day
 router.get('/:username', async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username.trim().toLowerCase() });
     if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    // --- LOGIN ATTEMPT LIMIT LOGIC ---
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    let loginEntry = user.loginAttempts.find(a => a.date === today);
+    if (!loginEntry) {
+      loginEntry = { date: today, count: 0 };
+      user.loginAttempts.push(loginEntry);
+    }
+    if (loginEntry.count >= 50) {
+      return res.status(429).json({ error: 'Login limit reached for today (50).' });
+    }
+    loginEntry.count += 1;
+    // Keep only the last 7 days for cleanup
+    user.loginAttempts = user.loginAttempts.filter(a => a.date >= new Date(Date.now() - 8*24*60*60*1000).toISOString().slice(0,10));
+    await user.save();
+    // --- END LOGIN ATTEMPT LIMIT LOGIC ---
+
     res.json({ _id: user._id, username: user.username });
   } catch (err) {
     res.status(400).json({ error: err.message });
