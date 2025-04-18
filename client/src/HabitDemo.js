@@ -196,11 +196,10 @@ const TrashIcon = ({color = '#888'}) => (
 export default function HabitDemo() {
   const [existingAction, setExistingAction] = useState(ALL_EXISTING_OPTIONS[0]);
   const [newAction, setNewAction] = useState(ALL_NEW_ACTIONS[0]);
-  const [timeOfDay, setTimeOfDay] = useState('morning');
-  const [reminderTime, setReminderTime] = useState('');
   const [habits, setHabits] = useState([]);
   const [message, setMessage] = useState('');
-  const [deleteId, setDeleteId] = useState(null);
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customInputValue, setCustomInputValue] = useState('');
 
   // Gamification: Score and Completion Percentage
   const [score, setScore] = useState(0);
@@ -275,8 +274,6 @@ export default function HabitDemo() {
           user: TEST_USER_ID,
           existingAction: existingAction.value,
           newAction,
-          timeOfDay,
-          reminderTime
         })
       });
       const data = await res.json();
@@ -303,11 +300,7 @@ export default function HabitDemo() {
     } catch {
       setMessage('Network error while deleting.');
     }
-    setDeleteId(null);
   };
-
-  const openDeleteModal = (id) => setDeleteId(id);
-  const closeDeleteModal = () => setDeleteId(null);
 
   return (
     <main style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #F7FAFC 0%, #E3F0FF 100%)', padding: 0, margin: 0 }}>
@@ -383,10 +376,12 @@ export default function HabitDemo() {
                     onClick={() => done ? unmarkHabitDone(habit._id) : markHabitDone(habit._id)}
                   />
                   <div style={{ flex: 1, fontWeight: 500, color: done ? '#4f8cff' : '#333', textDecoration: done ? 'line-through' : 'none', marginLeft: 12 }}>
-                    {habit.newAction}
+                    <span>{habit.existingAction}</span>
+                    <span style={{ margin: '0 8px', color: '#888' }}>→</span>
+                    <span>{habit.newAction}</span>
                   </div>
                   {/* Existing delete button/icon here */}
-                  <button onClick={() => openDeleteModal(habit._id)} style={trashButtonStyle}>
+                  <button onClick={() => handleDelete(habit._id)} style={trashButtonStyle}>
                     <TrashIcon color="#f44336" />
                   </button>
                 </div>
@@ -412,51 +407,65 @@ export default function HabitDemo() {
             </label>
             <label style={{ fontWeight: 500, color: '#333' }}>
               New Habit
-              <Select
-                options={NEW_ACTION_GROUPS_WITH_EXISTING.map(group => ({
-                  label: group.label,
-                  options: group.options.map(a => ({ value: a, label: a }))
-                }))}
-                value={{ value: newAction, label: newAction }}
-                onChange={option => setNewAction(option.value)}
-                styles={reactSelectStyles}
-                placeholder="Choose a new habit..."
-                isSearchable
-                formatGroupLabel={group => (
-                  <div style={{ fontWeight: 600, color: '#3949ab', fontSize: '1rem' }}>{group.label}</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%' }}>
+                <Select
+                  options={NEW_ACTION_GROUPS_WITH_EXISTING.map(group => ({
+                    label: group.label,
+                    options: group.options.map(a => ({ value: a, label: a }))
+                  })).concat([
+                    {
+                      label: 'Custom',
+                      options: [{ value: '__custom__', label: 'Enter custom...' }]
+                    }
+                  ])}
+                  value={
+                    NEW_ACTION_GROUPS_WITH_EXISTING.flatMap(g => g.options).includes(newAction)
+                      ? { value: newAction, label: newAction }
+                      : { value: newAction, label: newAction + ' (custom)' }
+                  }
+                  onChange={option => {
+                    if (option.value === '__custom__') {
+                      setShowCustomInput(true);
+                    } else {
+                      setNewAction(option.value);
+                      setShowCustomInput(false);
+                    }
+                  }}
+                  styles={{ ...reactSelectStyles, container: base => ({ ...base, width: '100%' }) }}
+                  placeholder="Choose a new habit..."
+                  isSearchable
+                  formatGroupLabel={group => (
+                    <div style={{ fontWeight: 600, color: '#3949ab', fontSize: '1rem' }}>{group.label}</div>
+                  )}
+                />
+                {showCustomInput && (
+                  <input
+                    type="text"
+                    autoFocus
+                    style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 7, border: '1px solid #bbb', fontSize: '1rem', background: '#f9fafd' }}
+                    placeholder="Enter custom habit..."
+                    value={customInputValue}
+                    onChange={e => setCustomInputValue(e.target.value)}
+                    onBlur={() => {
+                      if (customInputValue.trim()) setNewAction(customInputValue.trim());
+                      setShowCustomInput(false);
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && customInputValue.trim()) {
+                        setNewAction(customInputValue.trim());
+                        setShowCustomInput(false);
+                      } else if (e.key === 'Escape') {
+                        setShowCustomInput(false);
+                      }
+                    }}
+                  />
                 )}
-              />
-            </label>
-            <label style={{ fontWeight: 500, color: '#333' }}>
-              Time of Day
-              <select value={timeOfDay} onChange={e => setTimeOfDay(e.target.value)} style={selectStyle}>
-                <option value="morning">Morning</option>
-                <option value="afternoon">Afternoon</option>
-                <option value="evening">Evening</option>
-              </select>
-            </label>
-            <label style={{ fontWeight: 500, color: '#333' }}>
-              Reminder Time (optional)
-              <input type="time" value={reminderTime} onChange={e => setReminderTime(e.target.value)} style={inputStyle} />
+              </div>
             </label>
             <button type="submit" style={buttonStyle}>Add Habit</button>
           </form>
           {message && <div style={{ color: '#388e3c', margin: '14px 0', fontWeight: 500 }}>{message}</div>}
         </section>
-
-        {/* Custom Delete Confirmation Modal */}
-        {deleteId && (
-          <div style={modalOverlayStyle}>
-            <div style={modalStyle}>
-              <div style={{ marginBottom: 18, fontWeight: 600, fontSize: '1.1rem', color: '#222' }}>Delete this habit?</div>
-              <div style={{ marginBottom: 24, color: '#555' }}>This action cannot be undone.</div>
-              <div style={{ display: 'flex', gap: 12 }}>
-                <button onClick={() => handleDelete(deleteId)} style={modalDeleteBtnStyle}>Delete</button>
-                <button onClick={closeDeleteModal} style={modalCancelBtnStyle}>Cancel</button>
-              </div>
-            </div>
-          </div>
-        )}
       </section>
     </main>
   );
@@ -514,53 +523,6 @@ const trashButtonStyle = {
   padding: 0,
 };
 
-const modalOverlayStyle = {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  width: '100vw',
-  height: '100vh',
-  background: 'rgba(0,0,0,0.18)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 9999,
-};
-
-const modalStyle = {
-  background: '#fff',
-  borderRadius: 14,
-  boxShadow: '0 8px 32px #0002',
-  padding: '2rem 2.2rem',
-  minWidth: 260,
-  textAlign: 'center',
-};
-
-const modalDeleteBtnStyle = {
-  background: 'linear-gradient(90deg, #ff5252 0%, #ff1744 100%)',
-  color: '#fff',
-  border: 'none',
-  borderRadius: 7,
-  fontWeight: 600,
-  fontSize: '1rem',
-  padding: '8px 22px',
-  cursor: 'pointer',
-  boxShadow: '0 2px 8px #ff525222',
-};
-
-const modalCancelBtnStyle = {
-  background: '#f4f7fb',
-  color: '#222',
-  border: 'none',
-  borderRadius: 7,
-  fontWeight: 500,
-  fontSize: '1rem',
-  padding: '8px 22px',
-  cursor: 'pointer',
-  boxShadow: '0 1px 4px #0001',
-};
-
-// Custom styles for react-select
 const reactSelectStyles = {
   control: (base, state) => ({
     ...base,

@@ -16,7 +16,7 @@ const habitSchema = new mongoose.Schema({
   },
   timeOfDay: {
     type: String, // e.g., 'morning', 'afternoon', 'evening'
-    required: true
+    required: false
   },
   reminderTime: {
     type: String // e.g., '19:00' (24h format)

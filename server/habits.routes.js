@@ -7,13 +7,14 @@ const Habit = require('./habit.model');
 router.post('/', async (req, res) => {
   try {
     const { user, existingAction, newAction, timeOfDay, reminderTime } = req.body;
-    const habit = new Habit({
+    const habitData = {
       user,
       existingAction,
-      newAction,
-      timeOfDay,
-      reminderTime
-    });
+      newAction
+    };
+    if (typeof timeOfDay !== 'undefined') habitData.timeOfDay = timeOfDay;
+    if (typeof reminderTime !== 'undefined') habitData.reminderTime = reminderTime;
+    const habit = new Habit(habitData);
     await habit.save();
     res.status(201).json(habit);
   } catch (err) {
