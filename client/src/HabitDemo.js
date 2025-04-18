@@ -346,6 +346,31 @@ export default function HabitDemo() {
               </div>
             </div>
           </div>
+          {/* Encouragement Banner (dynamic, based on progress) */}
+          {habits.length > 0 && completionPct > 0 && completionPct < 100 && (
+            <div style={{
+              background: 'linear-gradient(90deg, #fffbe7 0%, #e3f0ff 100%)',
+              borderRadius: 10,
+              margin: '0 0 18px 0',
+              padding: '13px 20px',
+              fontWeight: 600,
+              color: '#3949ab',
+              fontSize: '1.08rem',
+              boxShadow: '0 2px 8px #3949ab11',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10
+            }}>
+              {(() => {
+                const left = habits.length - (completedHabits[todayStr]?.size || 0);
+                if (left === 1) return <>Almost there! Just <span style={{color:'#38b6ff'}}>1</span> left to go 🎯</>;
+                if (left <= 3) return <>You're so close! Only <span style={{color:'#38b6ff'}}>{left}</span> more to finish your stack 🚀</>;
+                if (completionPct >= 66) return <>Great progress! <span style={{color:'#38b6ff'}}>{left}</span> left for a perfect day 💪</>;
+                if (completionPct >= 33) return <>Nice start! <span style={{color:'#38b6ff'}}>{left}</span> more for a winning streak 🙌</>;
+                return <>Let's get started! Mark your first habit complete to build momentum 🌱</>;
+              })()}
+            </div>
+          )}
           {/* Habit List with completion checkmarks */}
           <div style={{ marginTop: 18 }}>
             {habits.length === 0 && <div style={{ color: '#888', fontWeight: 500 }}>No habits added yet.</div>}
