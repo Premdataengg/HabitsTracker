@@ -5,6 +5,12 @@ const loginLimitSchema = new mongoose.Schema({
   count: { type: Number, default: 0 }
 }, { _id: false });
 
+const dailyStateSchema = new mongoose.Schema({
+  date: { type: String, required: true }, // YYYY-MM-DD
+  completedHabits: [String], // Array of habit IDs completed that day
+  score: { type: Number, default: 0 }
+}, { _id: false });
+
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -16,6 +22,7 @@ const userSchema = new mongoose.Schema({
   resetPasswordToken: String,
   resetPasswordExpires: Date,
   loginAttempts: [loginLimitSchema],
+  dailyState: [dailyStateSchema],
   createdAt: {
     type: Date,
     default: Date.now

@@ -21,7 +21,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Get user by username, limit to 50 logins per day
+// Get user by username, limit to 50 logins per day, and return today's dailyState
 router.get('/:username', async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username.trim().toLowerCase() });
@@ -40,10 +40,41 @@ router.get('/:username', async (req, res) => {
     loginEntry.count += 1;
     // Keep only the last 7 days for cleanup
     user.loginAttempts = user.loginAttempts.filter(a => a.date >= new Date(Date.now() - 8*24*60*60*1000).toISOString().slice(0,10));
-    await user.save();
     // --- END LOGIN ATTEMPT LIMIT LOGIC ---
 
-    res.json({ _id: user._id, username: user.username });
+    // --- DAILY STATE LOGIC ---
+    let state = user.dailyState.find(s => s.date === today);
+    if (!state) {
+      state = { date: today, completedHabits: [], score: 0 };
+      user.dailyState.push(state);
+    }
+    // Clean up old state (keep last 7 days)
+    user.dailyState = user.dailyState.filter(s => s.date >= new Date(Date.now() - 8*24*60*60*1000).toISOString().slice(0,10));
+    await user.save();
+    // --- END DAILY STATE LOGIC ---
+
+    res.json({ _id: user._id, username: user.username, dailyState: state });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// PATCH endpoint to update today's dailyState (completedHabits, score)
+router.patch('/:username/daily', async (req, res) => {
+  try {
+    const { completedHabits, score } = req.body;
+    const user = await User.findOne({ username: req.params.username.trim().toLowerCase() });
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const today = new Date().toISOString().slice(0, 10);
+    let state = user.dailyState.find(s => s.date === today);
+    if (!state) {
+      state = { date: today, completedHabits: [], score: 0 };
+      user.dailyState.push(state);
+    }
+    if (Array.isArray(completedHabits)) state.completedHabits = completedHabits;
+    if (typeof score === 'number') state.score = score;
+    await user.save();
+    res.json({ dailyState: state });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

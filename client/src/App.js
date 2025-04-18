@@ -6,6 +6,14 @@ import { FiLogOut } from 'react-icons/fi';
 
 function App() {
   const [userId, setUserId] = useState(() => localStorage.getItem('userId') || '');
+  const [username, setUsername] = useState(() => localStorage.getItem('username') || '');
+  const [dailyState, setDailyState] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('dailyState')) || {};
+    } catch {
+      return {};
+    }
+  });
 
   useEffect(() => {
     if (userId) {
@@ -13,13 +21,54 @@ function App() {
     }
   }, [userId]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('userId');
-    setUserId('');
+  useEffect(() => {
+    if (username) {
+      localStorage.setItem('username', username);
+    }
+  }, [username]);
+
+  useEffect(() => {
+    if (dailyState && typeof dailyState === 'object') {
+      localStorage.setItem('dailyState', JSON.stringify(dailyState));
+    }
+  }, [dailyState]);
+
+  // On login, receive all info
+  const handleLogin = (id, uname, state) => {
+    setUserId(id);
+    setUsername(uname);
+    setDailyState(state);
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('userId');
+    localStorage.removeItem('username');
+    localStorage.removeItem('dailyState');
+    setUserId('');
+    setUsername('');
+    setDailyState({});
+  };
+
+  // At midnight, refresh state
+  useEffect(() => {
+    if (!userId || !username) return;
+    const checkMidnight = () => {
+      const today = new Date().toISOString().slice(0, 10);
+      if (dailyState?.date !== today) {
+        // Fetch new state from backend
+        fetch(`http://localhost:5050/api/users/${username}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.dailyState) setDailyState(data.dailyState);
+          });
+      }
+    };
+    const interval = setInterval(checkMidnight, 60 * 1000); // check every minute
+    return () => clearInterval(interval);
+  }, [userId, username, dailyState]);
+
   if (!userId) {
-    return <Login onLogin={setUserId} />;
+    return <Login onLogin={handleLogin} />;
   }
 
   return (
@@ -65,7 +114,7 @@ function App() {
           </button>
         </div>
       </header>
-      <HabitDemo userId={userId} />
+      <HabitDemo userId={userId} username={username} dailyState={dailyState} setDailyState={setDailyState} />
     </div>
   );
 }

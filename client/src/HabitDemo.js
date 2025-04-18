@@ -194,132 +194,52 @@ const TrashIcon = ({color = '#888'}) => (
   </svg>
 );
 
-export default function HabitDemo({ userId }) {
+export default function HabitDemo({ userId, username, dailyState, setDailyState }) {
   const [existingAction, setExistingAction] = useState(ALL_EXISTING_OPTIONS[0]);
   const [newAction, setNewAction] = useState(ALL_NEW_ACTIONS[0]);
   const [habits, setHabits] = useState([]);
   const [message, setMessage] = useState('');
 
-  // Gamification: Score and Completion Percentage
-  const [score, setScore] = useState(0);
-  const [completionPct, setCompletionPct] = useState(0);
-
-  // Track completed habits by date (key: date string, value: Set of habit IDs)
-  const [completedHabits, setCompletedHabits] = useState({});
+  // Use dailyState from props for completedHabits and score
   const todayStr = new Date().toISOString().slice(0, 10);
+  const completedHabits = dailyState?.completedHabits || [];
+  const score = dailyState?.score || 0;
 
-  // Mark habit as completed for today
-  const markHabitDone = (habitId) => {
-    setCompletedHabits(prev => {
-      const updated = { ...prev };
-      if (!updated[todayStr]) updated[todayStr] = new Set();
-      updated[todayStr] = new Set(updated[todayStr]);
-      updated[todayStr].add(habitId);
-      return updated;
+  // Fetch habits on mount
+  useEffect(() => {
+    if (!userId) return;
+    fetch(`${API_URL}?user=${userId}`)
+      .then(res => res.json())
+      .then(data => setHabits(Array.isArray(data) ? data : []));
+  }, [userId]);
+
+  // Mark habit as completed for today (update backend and local state)
+  const markHabitDone = async habitId => {
+    if (completedHabits.includes(habitId)) return;
+    const updated = [...completedHabits, habitId];
+    const newScore = score + 1;
+    setDailyState({ date: todayStr, completedHabits: updated, score: newScore });
+    await fetch(`http://localhost:5050/api/users/${username}/daily`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completedHabits: updated, score: newScore })
     });
   };
 
   // Unmark habit as completed for today
-  const unmarkHabitDone = (habitId) => {
-    setCompletedHabits(prev => {
-      const updated = { ...prev };
-      if (!updated[todayStr]) return updated;
-      updated[todayStr] = new Set(updated[todayStr]);
-      updated[todayStr].delete(habitId);
-      return updated;
+  const unmarkHabitDone = async habitId => {
+    if (!completedHabits.includes(habitId)) return;
+    const updated = completedHabits.filter(id => id !== habitId);
+    const newScore = Math.max(0, score - 1);
+    setDailyState({ date: todayStr, completedHabits: updated, score: newScore });
+    await fetch(`http://localhost:5050/api/users/${username}/daily`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completedHabits: updated, score: newScore })
     });
   };
 
-  // Calculate score and completion percentage whenever habits or completedHabits change
-  useEffect(() => {
-    const todayDone = completedHabits[todayStr] ? completedHabits[todayStr].size : 0;
-    setScore(todayDone * 10); // 10 points per habit completed
-    setCompletionPct(habits.length ? Math.round((todayDone / habits.length) * 100) : 0);
-  }, [habits, completedHabits, todayStr]);
-
-  // Build a map of day->completion percentage for the calendar (last 30 days)
-  const calendarCompletionMap = React.useMemo(() => {
-    const map = {};
-    const days = 30;
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dayStr = d.toISOString().slice(0, 10);
-      const done = completedHabits[dayStr] ? completedHabits[dayStr].size : 0;
-      map[dayStr] = habits.length ? Math.round((done / habits.length) * 100) : 0;
-    }
-    return map;
-  }, [completedHabits, habits]);
-
-  const fetchHabits = async () => {
-    const res = await fetch(`${API_URL}?user=${userId}`);
-    const data = await res.json();
-    setHabits(Array.isArray(data) ? data : []);
-  };
-
-  // On mount, fetch habits automatically
-  useEffect(() => {
-    fetchHabits();
-  }, []);
-
-  const isDuplicate = (optionA, optionB) => {
-    if (!optionA || !optionB) return false;
-    const valA = typeof optionA === 'string' ? optionA : optionA.value;
-    const valB = typeof optionB === 'string' ? optionB : optionB.value;
-    return valA && valB && valA.trim().toLowerCase() === valB.trim().toLowerCase();
-  };
-
-  const isStackDuplicate = (existingAction, newAction) => {
-    const getValue = v => (typeof v === 'object' && v !== null ? v.value : v);
-    const ex = getValue(existingAction);
-    const nw = getValue(newAction);
-    return habits.some(h =>
-      h.existingAction.trim().toLowerCase() === ex.trim().toLowerCase() &&
-      h.newAction.trim().toLowerCase() === nw.trim().toLowerCase()
-    );
-  };
-
-  const customNoOptionsMessage = ({ inputValue, selectType }) => {
-    if (isDuplicate(existingAction, newAction)) {
-      return 'Action and Habit cannot be the same.';
-    }
-    return selectType === 'menu' ? 'No options' : null;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setMessage('');
-    if (isDuplicate(existingAction, newAction)) {
-      setMessage('Action and Habit cannot be the same.');
-      return;
-    }
-    if (isStackDuplicate(existingAction, newAction)) {
-      setMessage('This habit stack already exists.');
-      return;
-    }
-    const getValue = v => (typeof v === 'object' && v !== null ? v.value : v);
-    try {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user: userId,
-          existingAction: getValue(existingAction),
-          newAction: getValue(newAction),
-        })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setMessage('Habit created!');
-        fetchHabits();
-      } else {
-        setMessage(data.error || 'Error creating habit');
-      }
-    } catch (err) {
-      setMessage('Network error');
-    }
-  };
-
+  // Restore handleDelete for deleting habits
   const handleDelete = async (id) => {
     try {
       const res = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
@@ -334,6 +254,60 @@ export default function HabitDemo({ userId }) {
     }
   };
 
+  // Helper functions for habit creation
+  const isDuplicate = (optionA, optionB) => {
+    if (!optionA || !optionB) return false;
+    const valA = typeof optionA === 'string' ? optionA : optionA.value;
+    const valB = typeof optionB === 'string' ? optionB : optionB.value;
+    return valA && valB && valA.trim().toLowerCase() === valB.trim().toLowerCase();
+  };
+
+  const customNoOptionsMessage = ({ inputValue, selectType }) => {
+    if (isDuplicate(existingAction, newAction)) {
+      return 'Action and Habit cannot be the same.';
+    }
+    return selectType === 'menu' ? 'No options' : null;
+  };
+
+  // Habit creation handler
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setMessage('');
+    if (isDuplicate(existingAction, newAction)) {
+      setMessage('Action and Habit cannot be the same.');
+      return;
+    }
+    // Prevent duplicate stack
+    const getValue = v => (typeof v === 'object' && v !== null ? v.value : v);
+    const ex = getValue(existingAction);
+    const nw = getValue(newAction);
+    if (habits.some(h => h.existingAction.trim().toLowerCase() === ex.trim().toLowerCase() && h.newAction.trim().toLowerCase() === nw.trim().toLowerCase())) {
+      setMessage('This habit stack already exists.');
+      return;
+    }
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user: userId,
+          existingAction: ex,
+          newAction: nw,
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage('Habit created!');
+        setHabits([...habits, data]);
+      } else {
+        setMessage(data.error || 'Error creating habit');
+      }
+    } catch (err) {
+      setMessage('Network error');
+    }
+  };
+
+  // Render habits and completion UI
   return (
     <main style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #F7FAFC 0%, #E3F0FF 100%)', padding: 0, margin: 0 }}>
       <section style={{ maxWidth: 480, margin: '0 auto', padding: '2rem 1rem' }}>
@@ -355,14 +329,14 @@ export default function HabitDemo({ userId }) {
               Daily Score: <span style={{ color: '#38b6ff' }}>{score}</span>
             </div>
             <div style={{ margin: '10px 0 0 0', fontWeight: 500, color: '#222' }}>
-              Completion: {completionPct}%
+              Completion: {(completedHabits.length / habits.length) * 100}%
             </div>
             <div style={{ margin: '8px 0 0 0', background: '#e3f0ff', borderRadius: 8, height: 18, width: 260, display: 'inline-block', overflow: 'hidden' }}>
-              <div style={{ background: 'linear-gradient(90deg, #38b6ff 0%, #4f8cff 100%)', width: `${completionPct}%`, height: '100%', borderRadius: 8, transition: 'width 0.3s' }} />
+              <div style={{ background: 'linear-gradient(90deg, #38b6ff 0%, #4f8cff 100%)', width: `${(completedHabits.length / habits.length) * 100}%`, height: '100%', borderRadius: 8, transition: 'width 0.3s' }} />
             </div>
             {/* Calendar Heatmap */}
             <div style={{ margin: '20px 0 0 0' }}>
-              <CalendarHeatmap completionMap={calendarCompletionMap} days={30} />
+              <CalendarHeatmap completionMap={{}} days={30} />
               <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 4, fontSize: '0.98em' }}>
                 <span><span style={{ display: 'inline-block', width: 16, height: 16, background: '#ff9800', borderRadius: 3, marginRight: 4, verticalAlign: 'middle' }} />33%</span>
                 <span><span style={{ display: 'inline-block', width: 16, height: 16, background: '#ffeb3b', borderRadius: 3, marginRight: 4, verticalAlign: 'middle' }} />66%</span>
@@ -371,7 +345,7 @@ export default function HabitDemo({ userId }) {
             </div>
           </div>
           {/* Encouragement Banner (dynamic, based on progress) */}
-          {habits.length > 0 && completionPct > 0 && completionPct < 100 && (
+          {habits.length > 0 && (completedHabits.length / habits.length) > 0 && (completedHabits.length / habits.length) < 1 && (
             <div style={{
               background: 'linear-gradient(90deg, #fffbe7 0%, #e3f0ff 100%)',
               borderRadius: 10,
@@ -386,11 +360,11 @@ export default function HabitDemo({ userId }) {
               gap: 10
             }}>
               {(() => {
-                const left = habits.length - (completedHabits[todayStr]?.size || 0);
+                const left = habits.length - completedHabits.length;
                 if (left === 1) return <>Almost there! Just <span style={{color:'#38b6ff'}}>1</span> left to go 🎯</>;
                 if (left <= 3) return <>You're so close! Only <span style={{color:'#38b6ff'}}>{left}</span> more to finish your stack 🚀</>;
-                if (completionPct >= 66) return <>Great progress! <span style={{color:'#38b6ff'}}>{left}</span> left for a perfect day 💪</>;
-                if (completionPct >= 33) return <>Nice start! <span style={{color:'#38b6ff'}}>{left}</span> more for a winning streak 🙌</>;
+                if ((completedHabits.length / habits.length) * 100 >= 66) return <>Great progress! <span style={{color:'#38b6ff'}}>{left}</span> left for a perfect day 💪</>;
+                if ((completedHabits.length / habits.length) * 100 >= 33) return <>Nice start! <span style={{color:'#38b6ff'}}>{left}</span> more for a winning streak 🙌</>;
                 return <>Let's get started! Mark your first habit complete to build momentum 🌱</>;
               })()}
             </div>
@@ -399,7 +373,7 @@ export default function HabitDemo({ userId }) {
           <div style={{ marginTop: 18 }}>
             {habits.length === 0 && <div style={{ color: '#888', fontWeight: 500 }}>No habits added yet.</div>}
             {habits.map(habit => {
-              const done = completedHabits[todayStr] && completedHabits[todayStr].has(habit._id);
+              const done = completedHabits.includes(habit._id);
               return (
                 <div key={habit._id} style={{ display: 'flex', alignItems: 'center', marginBottom: 10, background: '#fff', borderRadius: 8, boxShadow: '0 1px 4px #0001', padding: '10px 16px' }}>
                   <CompleteCircle

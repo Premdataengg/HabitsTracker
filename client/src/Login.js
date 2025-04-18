@@ -20,7 +20,9 @@ export default function Login({ onLogin }) {
       const res = await fetch(`${API_URL}/${username.trim().toLowerCase()}`);
       const data = await res.json();
       if (res.ok) {
-        onLogin(data._id); // pass ObjectId to App
+        localStorage.setItem('username', data.username);
+        localStorage.setItem('dailyState', JSON.stringify(data.dailyState));
+        onLogin(data._id, data.username, data.dailyState); // pass all to App
       } else {
         setError(data.error || 'Login failed.');
       }
