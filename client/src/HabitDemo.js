@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
+import CreatableSelect from 'react-select/creatable';
 import CalendarHeatmap from './CalendarHeatmap';
 import CompleteCircle from './CompleteCircle';
+import { FiPlusCircle } from 'react-icons/fi';
 
 const API_URL = 'http://localhost:5050/api/habits';
 const TEST_USER_ID = '000000000000000000000000';
@@ -198,8 +200,6 @@ export default function HabitDemo() {
   const [newAction, setNewAction] = useState(ALL_NEW_ACTIONS[0]);
   const [habits, setHabits] = useState([]);
   const [message, setMessage] = useState('');
-  const [showCustomInput, setShowCustomInput] = useState(false);
-  const [customInputValue, setCustomInputValue] = useState('');
 
   // Gamification: Score and Completion Percentage
   const [score, setScore] = useState(0);
@@ -263,17 +263,50 @@ export default function HabitDemo() {
     fetchHabits();
   }, []);
 
+  const isDuplicate = (optionA, optionB) => {
+    if (!optionA || !optionB) return false;
+    const valA = typeof optionA === 'string' ? optionA : optionA.value;
+    const valB = typeof optionB === 'string' ? optionB : optionB.value;
+    return valA && valB && valA.trim().toLowerCase() === valB.trim().toLowerCase();
+  };
+
+  const isStackDuplicate = (existingAction, newAction) => {
+    const getValue = v => (typeof v === 'object' && v !== null ? v.value : v);
+    const ex = getValue(existingAction);
+    const nw = getValue(newAction);
+    return habits.some(h =>
+      h.existingAction.trim().toLowerCase() === ex.trim().toLowerCase() &&
+      h.newAction.trim().toLowerCase() === nw.trim().toLowerCase()
+    );
+  };
+
+  const customNoOptionsMessage = ({ inputValue, selectType }) => {
+    if (isDuplicate(existingAction, newAction)) {
+      return 'Action and Habit cannot be the same.';
+    }
+    return selectType === 'menu' ? 'No options' : null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
+    if (isDuplicate(existingAction, newAction)) {
+      setMessage('Action and Habit cannot be the same.');
+      return;
+    }
+    if (isStackDuplicate(existingAction, newAction)) {
+      setMessage('This habit stack already exists.');
+      return;
+    }
+    const getValue = v => (typeof v === 'object' && v !== null ? v.value : v);
     try {
       const res = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user: TEST_USER_ID,
-          existingAction: existingAction.value,
-          newAction,
+          existingAction: getValue(existingAction),
+          newAction: getValue(newAction),
         })
       });
       const data = await res.json();
@@ -396,70 +429,57 @@ export default function HabitDemo() {
           <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 18 }}>
             <label style={{ fontWeight: 500, color: '#333' }}>
               Existing Action
-              <Select
-                options={ALL_EXISTING_OPTIONS}
-                value={existingAction}
-                onChange={option => setExistingAction(option)}
-                styles={reactSelectStyles}
-                placeholder="Choose an existing action..."
-                isSearchable
-              />
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%' }}>
+                <CreatableSelect
+                  options={ALL_EXISTING_OPTIONS}
+                  value={existingAction}
+                  onChange={option => {
+                    if (!isDuplicate(option, newAction)) setExistingAction(option);
+                  }}
+                  styles={{ ...reactSelectStyles, container: base => ({ ...base, width: '100%' }) }}
+                  placeholder="Choose or add existing action..."
+                  isClearable
+                  isSearchable
+                  formatCreateLabel={inputValue => (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#388e3c', fontSize: '1.03em' }}>
+                      <FiPlusCircle style={{ fontSize: 22, color: '#38b6ff' }} />
+                      Add <span style={{ color: '#3949ab', fontWeight: 700, marginLeft: 3 }}>&quot;{inputValue}&quot;</span>
+                    </div>
+                  )}
+                  onCreateOption={inputValue => {
+                    if (!isDuplicate({ value: inputValue }, newAction)) setExistingAction({ value: inputValue, label: inputValue });
+                  }}
+                  noOptionsMessage={customNoOptionsMessage}
+                />
+              </div>
             </label>
             <label style={{ fontWeight: 500, color: '#333' }}>
               New Habit
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%' }}>
-                <Select
+                <CreatableSelect
                   options={NEW_ACTION_GROUPS_WITH_EXISTING.map(group => ({
                     label: group.label,
-                    options: group.options.map(a => ({ value: a, label: a }))
-                  })).concat([
-                    {
-                      label: 'Custom',
-                      options: [{ value: '__custom__', label: 'Enter custom...' }]
-                    }
-                  ])}
-                  value={
-                    NEW_ACTION_GROUPS_WITH_EXISTING.flatMap(g => g.options).includes(newAction)
-                      ? { value: newAction, label: newAction }
-                      : { value: newAction, label: newAction + ' (custom)' }
-                  }
+                    options: group.options.map(a => typeof a === 'string' ? { value: a, label: a } : a)
+                  }))}
+                  value={typeof newAction === 'string' ? { value: newAction, label: newAction } : newAction}
                   onChange={option => {
-                    if (option.value === '__custom__') {
-                      setShowCustomInput(true);
-                    } else {
-                      setNewAction(option.value);
-                      setShowCustomInput(false);
-                    }
+                    if (!isDuplicate(existingAction, option)) setNewAction(option);
                   }}
                   styles={{ ...reactSelectStyles, container: base => ({ ...base, width: '100%' }) }}
-                  placeholder="Choose a new habit..."
+                  placeholder="Choose or add new habit..."
+                  isClearable
                   isSearchable
-                  formatGroupLabel={group => (
-                    <div style={{ fontWeight: 600, color: '#3949ab', fontSize: '1rem' }}>{group.label}</div>
+                  formatCreateLabel={inputValue => (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#388e3c', fontSize: '1.03em' }}>
+                      <FiPlusCircle style={{ fontSize: 22, color: '#38b6ff' }} />
+                      Add <span style={{ color: '#3949ab', fontWeight: 700, marginLeft: 3 }}>&quot;{inputValue}&quot;</span>
+                    </div>
                   )}
+                  onCreateOption={inputValue => {
+                    if (!isDuplicate(existingAction, { value: inputValue })) setNewAction({ value: inputValue, label: inputValue });
+                  }}
+                  noOptionsMessage={customNoOptionsMessage}
                 />
-                {showCustomInput && (
-                  <input
-                    type="text"
-                    autoFocus
-                    style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 7, border: '1px solid #bbb', fontSize: '1rem', background: '#f9fafd' }}
-                    placeholder="Enter custom habit..."
-                    value={customInputValue}
-                    onChange={e => setCustomInputValue(e.target.value)}
-                    onBlur={() => {
-                      if (customInputValue.trim()) setNewAction(customInputValue.trim());
-                      setShowCustomInput(false);
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && customInputValue.trim()) {
-                        setNewAction(customInputValue.trim());
-                        setShowCustomInput(false);
-                      } else if (e.key === 'Escape') {
-                        setShowCustomInput(false);
-                      }
-                    }}
-                  />
-                )}
               </div>
             </label>
             <button type="submit" style={buttonStyle}>Add Habit</button>
