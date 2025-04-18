@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
 
 const API_URL = 'http://localhost:5050/api/habits';
@@ -200,6 +200,43 @@ export default function HabitDemo() {
   const [message, setMessage] = useState('');
   const [deleteId, setDeleteId] = useState(null);
 
+  // Gamification: Score and Completion Percentage
+  const [score, setScore] = useState(0);
+  const [completionPct, setCompletionPct] = useState(0);
+
+  // Track completed habits by date (key: date string, value: Set of habit IDs)
+  const [completedHabits, setCompletedHabits] = useState({});
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // Mark habit as completed for today
+  const markHabitDone = (habitId) => {
+    setCompletedHabits(prev => {
+      const updated = { ...prev };
+      if (!updated[todayStr]) updated[todayStr] = new Set();
+      updated[todayStr] = new Set(updated[todayStr]);
+      updated[todayStr].add(habitId);
+      return updated;
+    });
+  };
+
+  // Unmark habit as completed for today
+  const unmarkHabitDone = (habitId) => {
+    setCompletedHabits(prev => {
+      const updated = { ...prev };
+      if (!updated[todayStr]) return updated;
+      updated[todayStr] = new Set(updated[todayStr]);
+      updated[todayStr].delete(habitId);
+      return updated;
+    });
+  };
+
+  // Calculate score and completion percentage whenever habits or completedHabits change
+  useEffect(() => {
+    const todayDone = completedHabits[todayStr] ? completedHabits[todayStr].size : 0;
+    setScore(todayDone * 10); // 10 points per habit completed
+    setCompletionPct(habits.length ? Math.round((todayDone / habits.length) * 100) : 0);
+  }, [habits, completedHabits, todayStr]);
+
   const fetchHabits = async () => {
     const res = await fetch(`${API_URL}?user=${TEST_USER_ID}`);
     const data = await res.json();
@@ -312,25 +349,42 @@ export default function HabitDemo() {
             <h3 style={{ fontWeight: 600, fontSize: '1.1rem', color: '#222', margin: 0 }}>Your Habit Stacks</h3>
             <button onClick={fetchHabits} style={{ ...buttonStyle, fontSize: '0.95rem', padding: '7px 16px', margin: 0 }}>Fetch Habits</button>
           </div>
-          <ul style={{ padding: 0, margin: 0, listStyle: 'none' }}>
-            {habits.map(habit => (
-              <li key={habit._id} style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 6px #0001', margin: '9px 0', padding: '13px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>
-                  <span style={{ fontWeight: 600, color: '#3949ab' }}>{habit.existingAction}</span> → <span style={{ color: '#222' }}>{habit.newAction}</span> <span style={{ fontSize: '0.95em', color: '#888' }}>({habit.timeOfDay})</span>
-                </span>
-                <button
-                  onClick={() => openDeleteModal(habit._id)}
-                  style={trashButtonStyle}
-                  title="Delete habit"
-                  onMouseEnter={e => e.currentTarget.firstChild.style.color = '#ff5252'}
-                  onMouseLeave={e => e.currentTarget.firstChild.style.color = '#888'}
-                >
-                  <TrashIcon color={deleteId === habit._id ? '#ff5252' : '#888'} />
-                </button>
-              </li>
-            ))}
-          </ul>
-          {habits.length === 0 && <div style={{ color: '#888', textAlign: 'center', marginTop: 16 }}>No habits yet. Add one above!</div>}
+          {/* Gamification: Score & Completion Bar */}
+          <div style={{ margin: '30px 0 18px 0', textAlign: 'center' }}>
+            <div style={{ fontWeight: 600, fontSize: '1.13rem', color: '#3949ab' }}>
+              Daily Score: <span style={{ color: '#38b6ff' }}>{score}</span>
+            </div>
+            <div style={{ margin: '10px 0 0 0', fontWeight: 500, color: '#222' }}>
+              Completion: {completionPct}%
+            </div>
+            <div style={{ margin: '8px 0 0 0', background: '#e3f0ff', borderRadius: 8, height: 18, width: 260, display: 'inline-block', overflow: 'hidden' }}>
+              <div style={{ background: 'linear-gradient(90deg, #38b6ff 0%, #4f8cff 100%)', width: `${completionPct}%`, height: '100%', borderRadius: 8, transition: 'width 0.3s' }} />
+            </div>
+          </div>
+          {/* Habit List with completion checkboxes */}
+          <div style={{ marginTop: 18 }}>
+            {habits.length === 0 && <div style={{ color: '#888', fontWeight: 500 }}>No habits added yet.</div>}
+            {habits.map(habit => {
+              const done = completedHabits[todayStr] && completedHabits[todayStr].has(habit._id);
+              return (
+                <div key={habit._id} style={{ display: 'flex', alignItems: 'center', marginBottom: 10, background: '#fff', borderRadius: 8, boxShadow: '0 1px 4px #0001', padding: '10px 16px' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!done}
+                    onChange={e => e.target.checked ? markHabitDone(habit._id) : unmarkHabitDone(habit._id)}
+                    style={{ marginRight: 14, width: 20, height: 20 }}
+                  />
+                  <div style={{ flex: 1, fontWeight: 500, color: done ? '#4f8cff' : '#333', textDecoration: done ? 'line-through' : 'none' }}>
+                    {habit.newAction}
+                  </div>
+                  {/* Existing delete button/icon here */}
+                  <button onClick={() => openDeleteModal(habit._id)} style={trashButtonStyle}>
+                    <TrashIcon color="#f44336" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
       {/* Custom Delete Confirmation Modal */}
