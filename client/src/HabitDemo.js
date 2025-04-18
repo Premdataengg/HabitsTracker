@@ -349,7 +349,6 @@ export default function HabitDemo() {
         <section style={{ background: '#f4f7fb', borderRadius: 16, boxShadow: '0 2px 12px #0001', padding: '32px 24px 28px 24px', margin: '30px 0 38px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <h3 style={{ fontWeight: 600, fontSize: '1.1rem', color: '#222', margin: 0 }}>Your Habit Stack</h3>
-            <button onClick={fetchHabits} style={{ ...buttonStyle, fontSize: '0.95rem', padding: '7px 16px', margin: 0 }}>Refresh</button>
           </div>
           {/* Gamification: Score & Completion Bar */}
           <div style={{ margin: '30px 0 18px 0', textAlign: 'center' }}>
