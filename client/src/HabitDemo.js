@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
+import CalendarHeatmap from './CalendarHeatmap';
+import CompleteCircle from './CompleteCircle';
 
 const API_URL = 'http://localhost:5050/api/habits';
 const TEST_USER_ID = '000000000000000000000000';
@@ -237,11 +239,30 @@ export default function HabitDemo() {
     setCompletionPct(habits.length ? Math.round((todayDone / habits.length) * 100) : 0);
   }, [habits, completedHabits, todayStr]);
 
+  // Build a map of day->completion percentage for the calendar (last 30 days)
+  const calendarCompletionMap = React.useMemo(() => {
+    const map = {};
+    const days = 30;
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dayStr = d.toISOString().slice(0, 10);
+      const done = completedHabits[dayStr] ? completedHabits[dayStr].size : 0;
+      map[dayStr] = habits.length ? Math.round((done / habits.length) * 100) : 0;
+    }
+    return map;
+  }, [completedHabits, habits]);
+
   const fetchHabits = async () => {
     const res = await fetch(`${API_URL}?user=${TEST_USER_ID}`);
     const data = await res.json();
     setHabits(Array.isArray(data) ? data : []);
   };
+
+  // On mount, fetch habits automatically
+  useEffect(() => {
+    fetchHabits();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -297,9 +318,62 @@ export default function HabitDemo() {
             Build new habits by stacking them onto your existing routines. Simple. Effective. Inspired by Atomic Habits.
           </p>
         </div>
-        <div style={{ background: '#fff', borderRadius: 18, boxShadow: '0 6px 32px #0001', padding: 28, marginBottom: 32 }}>
-          <h2 style={{ fontWeight: 600, fontSize: '1.25rem', marginBottom: 20, color: '#1a237e' }}>Create a Habit Stack</h2>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* --- HABIT STACK (TOP) --- */}
+        <section style={{ background: '#f4f7fb', borderRadius: 16, boxShadow: '0 2px 12px #0001', padding: '32px 24px 28px 24px', margin: '30px 0 38px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <h3 style={{ fontWeight: 600, fontSize: '1.1rem', color: '#222', margin: 0 }}>Your Habit Stack</h3>
+            <button onClick={fetchHabits} style={{ ...buttonStyle, fontSize: '0.95rem', padding: '7px 16px', margin: 0 }}>Refresh</button>
+          </div>
+          {/* Gamification: Score & Completion Bar */}
+          <div style={{ margin: '30px 0 18px 0', textAlign: 'center' }}>
+            <div style={{ fontWeight: 600, fontSize: '1.13rem', color: '#3949ab' }}>
+              Daily Score: <span style={{ color: '#38b6ff' }}>{score}</span>
+            </div>
+            <div style={{ margin: '10px 0 0 0', fontWeight: 500, color: '#222' }}>
+              Completion: {completionPct}%
+            </div>
+            <div style={{ margin: '8px 0 0 0', background: '#e3f0ff', borderRadius: 8, height: 18, width: 260, display: 'inline-block', overflow: 'hidden' }}>
+              <div style={{ background: 'linear-gradient(90deg, #38b6ff 0%, #4f8cff 100%)', width: `${completionPct}%`, height: '100%', borderRadius: 8, transition: 'width 0.3s' }} />
+            </div>
+            {/* Calendar Heatmap */}
+            <div style={{ margin: '20px 0 0 0' }}>
+              <CalendarHeatmap completionMap={calendarCompletionMap} days={30} />
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 4, fontSize: '0.98em' }}>
+                <span><span style={{ display: 'inline-block', width: 16, height: 16, background: '#ff9800', borderRadius: 3, marginRight: 4, verticalAlign: 'middle' }} />33%</span>
+                <span><span style={{ display: 'inline-block', width: 16, height: 16, background: '#ffeb3b', borderRadius: 3, marginRight: 4, verticalAlign: 'middle' }} />66%</span>
+                <span><span style={{ display: 'inline-block', width: 16, height: 16, background: '#4caf50', borderRadius: 3, marginRight: 4, verticalAlign: 'middle' }} />99%</span>
+              </div>
+            </div>
+          </div>
+          {/* Habit List with completion checkmarks */}
+          <div style={{ marginTop: 18 }}>
+            {habits.length === 0 && <div style={{ color: '#888', fontWeight: 500 }}>No habits added yet.</div>}
+            {habits.map(habit => {
+              const done = completedHabits[todayStr] && completedHabits[todayStr].has(habit._id);
+              return (
+                <div key={habit._id} style={{ display: 'flex', alignItems: 'center', marginBottom: 10, background: '#fff', borderRadius: 8, boxShadow: '0 1px 4px #0001', padding: '10px 16px' }}>
+                  <CompleteCircle
+                    done={!!done}
+                    onClick={() => done ? unmarkHabitDone(habit._id) : markHabitDone(habit._id)}
+                  />
+                  <div style={{ flex: 1, fontWeight: 500, color: done ? '#4f8cff' : '#333', textDecoration: done ? 'line-through' : 'none', marginLeft: 12 }}>
+                    {habit.newAction}
+                  </div>
+                  {/* Existing delete button/icon here */}
+                  <button onClick={() => openDeleteModal(habit._id)} style={trashButtonStyle}>
+                    <TrashIcon color="#f44336" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* --- CREATE HABIT STACK (BOTTOM) --- */}
+        <section style={{ background: '#fff', borderRadius: 16, boxShadow: '0 2px 12px #0001', padding: '32px 24px 28px 24px', margin: '38px 0 30px 0' }}>
+          <div style={{ fontWeight: 600, fontSize: '1.1rem', color: '#3949ab', marginBottom: 18 }}>Create Habit Stack</div>
+          <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 18 }}>
             <label style={{ fontWeight: 500, color: '#333' }}>
               Existing Action
               <Select
@@ -343,63 +417,22 @@ export default function HabitDemo() {
             <button type="submit" style={buttonStyle}>Add Habit</button>
           </form>
           {message && <div style={{ color: '#388e3c', margin: '14px 0', fontWeight: 500 }}>{message}</div>}
-        </div>
-        <div style={{ background: '#f4f7fb', borderRadius: 14, boxShadow: '0 2px 12px #0001', padding: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <h3 style={{ fontWeight: 600, fontSize: '1.1rem', color: '#222', margin: 0 }}>Your Habit Stacks</h3>
-            <button onClick={fetchHabits} style={{ ...buttonStyle, fontSize: '0.95rem', padding: '7px 16px', margin: 0 }}>Fetch Habits</button>
-          </div>
-          {/* Gamification: Score & Completion Bar */}
-          <div style={{ margin: '30px 0 18px 0', textAlign: 'center' }}>
-            <div style={{ fontWeight: 600, fontSize: '1.13rem', color: '#3949ab' }}>
-              Daily Score: <span style={{ color: '#38b6ff' }}>{score}</span>
-            </div>
-            <div style={{ margin: '10px 0 0 0', fontWeight: 500, color: '#222' }}>
-              Completion: {completionPct}%
-            </div>
-            <div style={{ margin: '8px 0 0 0', background: '#e3f0ff', borderRadius: 8, height: 18, width: 260, display: 'inline-block', overflow: 'hidden' }}>
-              <div style={{ background: 'linear-gradient(90deg, #38b6ff 0%, #4f8cff 100%)', width: `${completionPct}%`, height: '100%', borderRadius: 8, transition: 'width 0.3s' }} />
+        </section>
+
+        {/* Custom Delete Confirmation Modal */}
+        {deleteId && (
+          <div style={modalOverlayStyle}>
+            <div style={modalStyle}>
+              <div style={{ marginBottom: 18, fontWeight: 600, fontSize: '1.1rem', color: '#222' }}>Delete this habit?</div>
+              <div style={{ marginBottom: 24, color: '#555' }}>This action cannot be undone.</div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button onClick={() => handleDelete(deleteId)} style={modalDeleteBtnStyle}>Delete</button>
+                <button onClick={closeDeleteModal} style={modalCancelBtnStyle}>Cancel</button>
+              </div>
             </div>
           </div>
-          {/* Habit List with completion checkboxes */}
-          <div style={{ marginTop: 18 }}>
-            {habits.length === 0 && <div style={{ color: '#888', fontWeight: 500 }}>No habits added yet.</div>}
-            {habits.map(habit => {
-              const done = completedHabits[todayStr] && completedHabits[todayStr].has(habit._id);
-              return (
-                <div key={habit._id} style={{ display: 'flex', alignItems: 'center', marginBottom: 10, background: '#fff', borderRadius: 8, boxShadow: '0 1px 4px #0001', padding: '10px 16px' }}>
-                  <input
-                    type="checkbox"
-                    checked={!!done}
-                    onChange={e => e.target.checked ? markHabitDone(habit._id) : unmarkHabitDone(habit._id)}
-                    style={{ marginRight: 14, width: 20, height: 20 }}
-                  />
-                  <div style={{ flex: 1, fontWeight: 500, color: done ? '#4f8cff' : '#333', textDecoration: done ? 'line-through' : 'none' }}>
-                    {habit.newAction}
-                  </div>
-                  {/* Existing delete button/icon here */}
-                  <button onClick={() => openDeleteModal(habit._id)} style={trashButtonStyle}>
-                    <TrashIcon color="#f44336" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        )}
       </section>
-      {/* Custom Delete Confirmation Modal */}
-      {deleteId && (
-        <div style={modalOverlayStyle}>
-          <div style={modalStyle}>
-            <div style={{ marginBottom: 18, fontWeight: 600, fontSize: '1.1rem', color: '#222' }}>Delete this habit?</div>
-            <div style={{ marginBottom: 24, color: '#555' }}>This action cannot be undone.</div>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button onClick={() => handleDelete(deleteId)} style={modalDeleteBtnStyle}>Delete</button>
-              <button onClick={closeDeleteModal} style={modalCancelBtnStyle}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }
