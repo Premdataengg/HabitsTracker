@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('./user.model');
+const Habit = require('./habit.model');
 
 // Register a new user (username only)
 router.post('/', async (req, res) => {
@@ -45,8 +46,15 @@ router.get('/:username', async (req, res) => {
     // --- DAILY STATE LOGIC ---
     let state = user.dailyState.find(s => s.date === today);
     if (!state) {
-      state = { date: today, completedHabits: [], score: 0 };
+      state = { date: today, completedHabits: [], score: 0, completionPct: 0 };
       user.dailyState.push(state);
+    } else {
+      if (!Array.isArray(state.completedHabits)) state.completedHabits = [];
+      // Always use stored completedHabits (persisted by PATCH)
+      state.score = state.completedHabits.length;
+      // Calculate completionPct from user's habits for today
+      const habitsCount = await Habit.countDocuments({ user: user._id });
+      state.completionPct = habitsCount > 0 ? Math.round((state.completedHabits.length / habitsCount) * 100) : 0;
     }
     // Clean up old state (keep last 7 days)
     user.dailyState = user.dailyState.filter(s => s.date >= new Date(Date.now() - 8*24*60*60*1000).toISOString().slice(0,10));
@@ -59,20 +67,21 @@ router.get('/:username', async (req, res) => {
   }
 });
 
-// PATCH endpoint to update today's dailyState (completedHabits, score)
+// PATCH endpoint to update today's dailyState (completedHabits, score, completionPct)
 router.patch('/:username/daily', async (req, res) => {
   try {
-    const { completedHabits, score } = req.body;
+    const { completedHabits, score, completionPct } = req.body;
     const user = await User.findOne({ username: req.params.username.trim().toLowerCase() });
     if (!user) return res.status(404).json({ error: 'User not found.' });
     const today = new Date().toISOString().slice(0, 10);
     let state = user.dailyState.find(s => s.date === today);
     if (!state) {
-      state = { date: today, completedHabits: [], score: 0 };
+      state = { date: today, completedHabits: [], score: 0, completionPct: 0 };
       user.dailyState.push(state);
     }
     if (Array.isArray(completedHabits)) state.completedHabits = completedHabits;
     if (typeof score === 'number') state.score = score;
+    if (typeof completionPct === 'number') state.completionPct = completionPct;
     await user.save();
     res.json({ dailyState: state });
   } catch (err) {

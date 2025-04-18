@@ -6,6 +6,7 @@ import CompleteCircle from './CompleteCircle';
 import { FiPlusCircle } from 'react-icons/fi';
 
 const API_URL = 'http://localhost:5050/api/habits';
+const USER_API_URL = 'http://localhost:5050/api/users';
 
 // Grouped options for Existing Actions (Atomic Habits style)
 const EXISTING_ACTION_GROUPS = [
@@ -200,12 +201,11 @@ export default function HabitDemo({ userId, username, dailyState, setDailyState 
   const [habits, setHabits] = useState([]);
   const [message, setMessage] = useState('');
 
-  // Use dailyState from props for completedHabits and score
   const todayStr = new Date().toISOString().slice(0, 10);
   const completedHabits = dailyState?.completedHabits || [];
   const score = dailyState?.score || 0;
+  const completionPct = habits.length ? Math.round((completedHabits.length / habits.length) * 100) : 0;
 
-  // Fetch habits on mount
   useEffect(() => {
     if (!userId) return;
     fetch(`${API_URL}?user=${userId}`)
@@ -218,12 +218,20 @@ export default function HabitDemo({ userId, username, dailyState, setDailyState 
     if (completedHabits.includes(habitId)) return;
     const updated = [...completedHabits, habitId];
     const newScore = score + 1;
-    setDailyState({ date: todayStr, completedHabits: updated, score: newScore });
-    await fetch(`http://localhost:5050/api/users/${username}/daily`, {
+    const newPct = habits.length ? Math.round((updated.length / habits.length) * 100) : 0;
+    // Await PATCH and use backend's dailyState
+    const res = await fetch(`${USER_API_URL}/${username}/daily`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ completedHabits: updated, score: newScore })
+      body: JSON.stringify({ completedHabits: updated, score: newScore, completionPct: newPct })
     });
+    const data = await res.json();
+    if (res.ok && data.dailyState) {
+      setDailyState(data.dailyState);
+    } else {
+      // fallback to local update
+      setDailyState({ date: todayStr, completedHabits: updated, score: newScore, completionPct: newPct });
+    }
   };
 
   // Unmark habit as completed for today
@@ -231,12 +239,18 @@ export default function HabitDemo({ userId, username, dailyState, setDailyState 
     if (!completedHabits.includes(habitId)) return;
     const updated = completedHabits.filter(id => id !== habitId);
     const newScore = Math.max(0, score - 1);
-    setDailyState({ date: todayStr, completedHabits: updated, score: newScore });
-    await fetch(`http://localhost:5050/api/users/${username}/daily`, {
+    const newPct = habits.length ? Math.round((updated.length / habits.length) * 100) : 0;
+    const res = await fetch(`${USER_API_URL}/${username}/daily`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ completedHabits: updated, score: newScore })
+      body: JSON.stringify({ completedHabits: updated, score: newScore, completionPct: newPct })
     });
+    const data = await res.json();
+    if (res.ok && data.dailyState) {
+      setDailyState(data.dailyState);
+    } else {
+      setDailyState({ date: todayStr, completedHabits: updated, score: newScore, completionPct: newPct });
+    }
   };
 
   // Restore handleDelete for deleting habits
@@ -329,10 +343,10 @@ export default function HabitDemo({ userId, username, dailyState, setDailyState 
               Daily Score: <span style={{ color: '#38b6ff' }}>{score}</span>
             </div>
             <div style={{ margin: '10px 0 0 0', fontWeight: 500, color: '#222' }}>
-              Completion: {(completedHabits.length / habits.length) * 100}%
+              Completion: {completionPct}%
             </div>
             <div style={{ margin: '8px 0 0 0', background: '#e3f0ff', borderRadius: 8, height: 18, width: 260, display: 'inline-block', overflow: 'hidden' }}>
-              <div style={{ background: 'linear-gradient(90deg, #38b6ff 0%, #4f8cff 100%)', width: `${(completedHabits.length / habits.length) * 100}%`, height: '100%', borderRadius: 8, transition: 'width 0.3s' }} />
+              <div style={{ background: 'linear-gradient(90deg, #38b6ff 0%, #4f8cff 100%)', width: `${completionPct}%`, height: '100%', borderRadius: 8, transition: 'width 0.3s' }} />
             </div>
             {/* Calendar Heatmap */}
             <div style={{ margin: '20px 0 0 0' }}>
@@ -345,7 +359,7 @@ export default function HabitDemo({ userId, username, dailyState, setDailyState 
             </div>
           </div>
           {/* Encouragement Banner (dynamic, based on progress) */}
-          {habits.length > 0 && (completedHabits.length / habits.length) > 0 && (completedHabits.length / habits.length) < 1 && (
+          {habits.length > 0 && completionPct > 0 && completionPct < 100 && (
             <div style={{
               background: 'linear-gradient(90deg, #fffbe7 0%, #e3f0ff 100%)',
               borderRadius: 10,
@@ -363,8 +377,8 @@ export default function HabitDemo({ userId, username, dailyState, setDailyState 
                 const left = habits.length - completedHabits.length;
                 if (left === 1) return <>Almost there! Just <span style={{color:'#38b6ff'}}>1</span> left to go 🎯</>;
                 if (left <= 3) return <>You're so close! Only <span style={{color:'#38b6ff'}}>{left}</span> more to finish your stack 🚀</>;
-                if ((completedHabits.length / habits.length) * 100 >= 66) return <>Great progress! <span style={{color:'#38b6ff'}}>{left}</span> left for a perfect day 💪</>;
-                if ((completedHabits.length / habits.length) * 100 >= 33) return <>Nice start! <span style={{color:'#38b6ff'}}>{left}</span> more for a winning streak 🙌</>;
+                if (completionPct >= 66) return <>Great progress! <span style={{color:'#38b6ff'}}>{left}</span> left for a perfect day 💪</>;
+                if (completionPct >= 33) return <>Nice start! <span style={{color:'#38b6ff'}}>{left}</span> more for a winning streak 🙌</>;
                 return <>Let's get started! Mark your first habit complete to build momentum 🌱</>;
               })()}
             </div>

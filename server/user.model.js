@@ -8,7 +8,8 @@ const loginLimitSchema = new mongoose.Schema({
 const dailyStateSchema = new mongoose.Schema({
   date: { type: String, required: true }, // YYYY-MM-DD
   completedHabits: [String], // Array of habit IDs completed that day
-  score: { type: Number, default: 0 }
+  score: { type: Number, default: 0 },
+  completionPct: { type: Number, default: 0 },
 }, { _id: false });
 
 const userSchema = new mongoose.Schema({

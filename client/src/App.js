@@ -9,9 +9,18 @@ function App() {
   const [username, setUsername] = useState(() => localStorage.getItem('username') || '');
   const [dailyState, setDailyState] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('dailyState')) || {};
+      const state = JSON.parse(localStorage.getItem('dailyState'));
+      if (state && typeof state === 'object') {
+        return {
+          date: state.date || '',
+          completedHabits: state.completedHabits || [],
+          score: typeof state.score === 'number' ? state.score : 0,
+          completionPct: typeof state.completionPct === 'number' ? state.completionPct : 0,
+        };
+      }
+      return { date: '', completedHabits: [], score: 0, completionPct: 0 };
     } catch {
-      return {};
+      return { date: '', completedHabits: [], score: 0, completionPct: 0 };
     }
   });
 
@@ -37,7 +46,12 @@ function App() {
   const handleLogin = (id, uname, state) => {
     setUserId(id);
     setUsername(uname);
-    setDailyState(state);
+    setDailyState({
+      date: state?.date || '',
+      completedHabits: state?.completedHabits || [],
+      score: typeof state?.score === 'number' ? state.score : 0,
+      completionPct: typeof state?.completionPct === 'number' ? state.completionPct : 0,
+    });
   };
 
   const handleLogout = () => {
@@ -46,7 +60,7 @@ function App() {
     localStorage.removeItem('dailyState');
     setUserId('');
     setUsername('');
-    setDailyState({});
+    setDailyState({ date: '', completedHabits: [], score: 0, completionPct: 0 });
   };
 
   // At midnight, refresh state
