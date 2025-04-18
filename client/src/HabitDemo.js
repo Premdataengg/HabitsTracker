@@ -1,22 +1,75 @@
 import React, { useState } from 'react';
+import Select from 'react-select';
 
 const API_URL = 'http://localhost:5050/api/habits';
 const TEST_USER_ID = '000000000000000000000000';
 
-const NEW_ACTIONS = [
-  'Drink a glass of water',
-  'Plan my daily tasks',
-  'Stretch for two minutes',
-  'Take a five-minute walk',
-  'Note my priority task',
-  'Do one minute of deep breathing',
-  'Read for five minutes',
-  'Write down one gratitude statement',
-  'Journal briefly',
+// Grouped options for Existing Actions (Atomic Habits style)
+const EXISTING_ACTION_GROUPS = [
+  {
+    label: 'Morning Routine',
+    options: [
+      { value: 'Wake up', label: 'Wake up' },
+      { value: 'Brush teeth', label: 'Brush teeth' },
+      { value: 'Take a shower', label: 'Take a shower' },
+      { value: 'Use deodorant', label: 'Use deodorant' },
+      { value: 'Skincare or grooming', label: 'Skincare or grooming' },
+      { value: 'Get dressed', label: 'Get dressed' },
+      { value: 'Comb/brush hair', label: 'Comb/brush hair' },
+      { value: 'Clip nails (occasionally)', label: 'Clip nails (occasionally)' },
+      { value: 'Use the restroom', label: 'Use the restroom' },
+      { value: 'Wash hands regularly', label: 'Wash hands regularly' },
+    ]
+  },
+  {
+    label: 'Eating & Drinking',
+    options: [
+      { value: 'Drink water', label: 'Drink water' },
+      { value: 'Eat breakfast', label: 'Eat breakfast' },
+      { value: 'Have lunch', label: 'Have lunch' },
+      { value: 'Have dinner', label: 'Have dinner' },
+      { value: 'Drink coffee or tea', label: 'Drink coffee or tea' },
+      { value: 'Snack between meals (optional)', label: 'Snack between meals (optional)' },
+    ]
+  },
+  {
+    label: 'Work & Productivity',
+    options: [
+      { value: 'Check phone', label: 'Check phone' },
+      { value: 'Check emails', label: 'Check emails' },
+      { value: 'Attend meetings or calls', label: 'Attend meetings or calls' },
+      { value: 'Work on tasks/projects', label: 'Work on tasks/projects' },
+      { value: 'Take breaks', label: 'Take breaks' },
+      { value: 'Commute (or log into work)', label: 'Commute (or log into work)' },
+      { value: 'Make to-do list (optional)', label: 'Make to-do list (optional)' },
+      { value: 'Shut down/log off from work', label: 'Shut down/log off from work' },
+    ]
+  },
+  {
+    label: 'Home & Daily Chores',
+    options: [
+      { value: 'Make the bed', label: 'Make the bed' },
+      { value: 'Do dishes', label: 'Do dishes' },
+      { value: 'Tidy up/clean', label: 'Tidy up/clean' },
+      { value: 'Take out trash (as needed)', label: 'Take out trash (as needed)' },
+      { value: 'Do laundry (a few times a week)', label: 'Do laundry (a few times a week)' },
+    ]
+  },
+  {
+    label: 'Relaxation & Wind-down',
+    options: [
+      { value: 'Watch TV / YouTube / scroll phone', label: 'Watch TV / YouTube / scroll phone' },
+      { value: 'Talk to family or friends', label: 'Talk to family or friends' },
+      { value: 'Spend time with kids/pets', label: 'Spend time with kids/pets' },
+      { value: 'Read a book / browse the news', label: 'Read a book / browse the news' },
+      { value: 'Take evening shower (optional)', label: 'Take evening shower (optional)' },
+      { value: 'Go to bed / sleep', label: 'Go to bed / sleep' },
+    ]
+  }
 ];
 
-// Grouped actions for dropdown
-const ACTION_GROUPS = [
+// Grouped options for New Habit (same as user provided list)
+const NEW_ACTION_GROUPS = [
   {
     label: 'Health Habits',
     options: [
@@ -109,8 +162,22 @@ const ACTION_GROUPS = [
   }
 ];
 
-// Flatten for default
-const ALL_ACTIONS = ACTION_GROUPS.flatMap(g => g.options);
+// Combine all unique items from EXISTING_ACTION_GROUPS into NEW_ACTION_GROUPS
+const existingActionsFlat = EXISTING_ACTION_GROUPS.flatMap(g => g.options.map(o => (typeof o === 'string' ? o : o.value)));
+const newActionsFlat = NEW_ACTION_GROUPS.flatMap(g => g.options);
+const allUniqueNewActions = Array.from(new Set([...newActionsFlat, ...existingActionsFlat]));
+
+// Add to New Habit as an extra group
+const NEW_ACTION_GROUPS_WITH_EXISTING = [
+  ...NEW_ACTION_GROUPS,
+  {
+    label: 'Routine & Daily Actions',
+    options: existingActionsFlat.filter(a => !newActionsFlat.includes(a)),
+  }
+];
+
+const ALL_EXISTING_OPTIONS = EXISTING_ACTION_GROUPS.flatMap(g => g.options);
+const ALL_NEW_ACTIONS = NEW_ACTION_GROUPS_WITH_EXISTING.flatMap(g => g.options);
 
 // SVG Trash Icon
 const TrashIcon = ({color = '#888'}) => (
@@ -125,8 +192,8 @@ const TrashIcon = ({color = '#888'}) => (
 );
 
 export default function HabitDemo() {
-  const [existingAction, setExistingAction] = useState(ALL_ACTIONS[0]);
-  const [newAction, setNewAction] = useState(NEW_ACTIONS[0]);
+  const [existingAction, setExistingAction] = useState(ALL_EXISTING_OPTIONS[0]);
+  const [newAction, setNewAction] = useState(ALL_NEW_ACTIONS[0]);
   const [timeOfDay, setTimeOfDay] = useState('morning');
   const [reminderTime, setReminderTime] = useState('');
   const [habits, setHabits] = useState([]);
@@ -148,7 +215,7 @@ export default function HabitDemo() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user: TEST_USER_ID,
-          existingAction,
+          existingAction: existingAction.value,
           newAction,
           timeOfDay,
           reminderTime
@@ -198,21 +265,31 @@ export default function HabitDemo() {
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <label style={{ fontWeight: 500, color: '#333' }}>
               Existing Action
-              <select value={existingAction} onChange={e => setExistingAction(e.target.value)} style={selectStyle}>
-                {ACTION_GROUPS.map((group, gi) => (
-                  <optgroup key={gi} label={group.label}>
-                    {group.options.map((action, i) => (
-                      <option key={i} value={action}>{action}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+              <Select
+                options={ALL_EXISTING_OPTIONS}
+                value={existingAction}
+                onChange={option => setExistingAction(option)}
+                styles={reactSelectStyles}
+                placeholder="Choose an existing action..."
+                isSearchable
+              />
             </label>
             <label style={{ fontWeight: 500, color: '#333' }}>
               New Habit
-              <select value={newAction} onChange={e => setNewAction(e.target.value)} style={selectStyle}>
-                {NEW_ACTIONS.map((action, i) => <option key={i} value={action}>{action}</option>)}
-              </select>
+              <Select
+                options={NEW_ACTION_GROUPS_WITH_EXISTING.map(group => ({
+                  label: group.label,
+                  options: group.options.map(a => ({ value: a, label: a }))
+                }))}
+                value={{ value: newAction, label: newAction }}
+                onChange={option => setNewAction(option.value)}
+                styles={reactSelectStyles}
+                placeholder="Choose a new habit..."
+                isSearchable
+                formatGroupLabel={group => (
+                  <div style={{ fontWeight: 600, color: '#3949ab', fontSize: '1rem' }}>{group.label}</div>
+                )}
+              />
             </label>
             <label style={{ fontWeight: 500, color: '#333' }}>
               Time of Day
@@ -369,4 +446,39 @@ const modalCancelBtnStyle = {
   padding: '8px 22px',
   cursor: 'pointer',
   boxShadow: '0 1px 4px #0001',
+};
+
+// Custom styles for react-select
+const reactSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    borderRadius: 7,
+    borderColor: state.isFocused ? '#4f8cff' : '#bbb',
+    boxShadow: state.isFocused ? '0 0 0 2px #4f8cff33' : 'none',
+    fontSize: '1rem',
+    background: '#f9fafd',
+    minHeight: 42,
+    paddingLeft: 2,
+  }),
+  menu: base => ({
+    ...base,
+    borderRadius: 8,
+    boxShadow: '0 4px 24px #0002',
+    zIndex: 10,
+  }),
+  option: (base, state) => ({
+    ...base,
+    background: state.isSelected ? '#e3f0ff' : state.isFocused ? '#f4f7fb' : '#fff',
+    color: '#222',
+    fontWeight: state.isSelected ? 600 : 400,
+    fontSize: '1rem',
+    cursor: 'pointer',
+  }),
+  groupHeading: base => ({
+    ...base,
+    color: '#3949ab',
+    fontWeight: 700,
+    fontSize: '1rem',
+    padding: '6px 12px',
+  }),
 };
