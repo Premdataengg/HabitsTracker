@@ -341,7 +341,7 @@ export default function HabitDemo() {
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <h1 style={{ fontSize: '2.6rem', fontWeight: 700, margin: 0, letterSpacing: '-2px', color: '#222' }}>HabitsTracker</h1>
           <p style={{ fontSize: '1.15rem', color: '#555', marginTop: 12, marginBottom: 0 }}>
-            Build new habits by stacking them onto your existing routines. Simple. Effective. Inspired by Atomic Habits.
+            Build new habits by stacking them onto your existing routines. Simple. Effective.
           </p>
         </div>
 
